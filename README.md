@@ -145,7 +145,7 @@ These results suggest that influence, activity consistency, and experience are s
 ## 📁 Project Structure
 
 ```text
-├── dataset/
+├── dataset/
 │ └── developers_features_engineered.csv
 └── GitHub_Behavioral_Analytics_ML_Pipeline.ipynb
 ```
@@ -227,4 +227,5 @@ Domain: Data Science & Machine Learning
 ## ⭐ If you found this useful
 
 Consider giving the repo a star ⭐
+
 
