@@ -1,0 +1,63 @@
+{
+  "selected_model": "Logistic Regression",
+  "models": {
+    "Baseline (majority class)": {
+      "cv_accuracy_mean": 0.3445829123221422,
+      "cv_accuracy_std": 0.0001160229377104455,
+      "cv_f1_macro_mean": 0.17084995984888196,
+      "train_accuracy": 0.3445829109772822,
+      "test_accuracy": 0.3446219890293346,
+      "test_f1_macro": 0.17086437270899846,
+      "test_roc_auc_ovr": 0.5
+    },
+    "Logistic Regression": {
+      "cv_accuracy_mean": 0.6352033783981936,
+      "cv_accuracy_std": 0.003980325117114215,
+      "cv_f1_macro_mean": 0.628748112200016,
+      "train_accuracy": 0.6357998926718741,
+      "test_accuracy": 0.635821607440973,
+      "test_f1_macro": 0.6304569243070944,
+      "test_roc_auc_ovr": 0.8165637703804577
+    },
+    "Random Forest": {
+      "cv_accuracy_mean": 0.6286443661815373,
+      "cv_accuracy_std": 0.004308657129546561,
+      "cv_f1_macro_mean": 0.6240262642437456,
+      "train_accuracy": 0.8255321686244111,
+      "test_accuracy": 0.6281898402098736,
+      "test_f1_macro": 0.6245167219007177,
+      "test_roc_auc_ovr": 0.8103465776388333
+    },
+    "XGBoost": {
+      "cv_accuracy_mean": 0.6337128343761969,
+      "cv_accuracy_std": 0.0054196587932552045,
+      "cv_f1_macro_mean": 0.6286422691068653,
+      "train_accuracy": 0.7206487388945203,
+      "test_accuracy": 0.6403529692344383,
+      "test_f1_macro": 0.6353925958483401,
+      "test_roc_auc_ovr": 0.8166120002050663
+    }
+  },
+  "shap_mean_abs_high_risk": {
+    "repos_per_year": 0.6178,
+    "following": 0.4181,
+    "account_age_days": 0.411,
+    "public_gists": 0.1946,
+    "has_company": 0.1604,
+    "repo_gist_ratio": 0.1137,
+    "total_projects": 0.1037,
+    "has_bio": 0.1026,
+    "public_repos": 0.0882,
+    "profile_completeness": 0.0769,
+    "hireable": 0.0634,
+    "bio_length": 0.0561,
+    "project_density": 0.0262,
+    "has_location": 0.016
+  },
+  "n_rows": 20964,
+  "class_balance": {
+    "0": 7224,
+    "1": 6792,
+    "2": 6948
+  }
+}

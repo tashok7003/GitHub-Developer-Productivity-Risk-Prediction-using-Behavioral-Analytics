@@ -1,0 +1,11 @@
+Logistic Regression
+
+                            precision    recall  f1-score   support
+
+High Risk (low visibility)       0.72      0.76      0.74      1445
+               Medium Risk       0.50      0.46      0.48      1358
+Low Risk (high visibility)       0.67      0.67      0.67      1390
+
+                  accuracy                           0.64      4193
+                 macro avg       0.63      0.63      0.63      4193
+              weighted avg       0.63      0.64      0.63      4193
