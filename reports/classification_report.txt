@@ -1,4 +1,5 @@
 Logistic Regression
+followers-only: High 0-19 | Medium 20-99 | Low 100+
 
                             precision    recall  f1-score   support
 

@@ -34,6 +34,15 @@ Recruiters and hiring tools use GitHub as a first filter, and follower count is 
 
 **Leakage rule:** the target is built from `followers`, so **no follower-derived feature is a model input**. This is enforced by an assertion in training and by unit tests.
 
+### v3: stars, commits and activity (in progress)
+
+v3 extends the project in two directions. The v3 scraper is ready; its results will be added after collection.
+
+| Task | Question | Target | Inputs |
+|---|---|---|---|
+| **Visibility risk** (upgraded) | Will the developer *and their work* go unnoticed? | 🔴 High = <20 followers **and** <10 stars · 🟢 Low = 100+ followers **or** 100+ stars · 🟡 Medium = rest | Profile + repo quality + commits, PRs, issues, reviews, active days (never followers, stars or forks received) |
+| **Activity decline risk** (new) | Will a developer who was active last year slow down or stop? | ⚫ Inactive = 0 contributions this year · 🟠 Declining = <50% of last year · 🟢 Active = rest | **Only the previous year's** activity and stable profile facts, so nothing from the outcome year leaks in |
+
 ---
 
 ## ⚠️ What changed from v1 (and why)
@@ -92,11 +101,12 @@ The v1 notebook is kept in [`legacy/`](legacy/) for transparency.
 ```text
 ├── GitHub_Developer_Visibility_Risk_Pipeline.ipynb   # full walkthrough, executed
 ├── src/
-│   ├── collect.py     # GitHub API data collection (token via env var)
+│   ├── collect.py     # resumable data collection (v3: profiles, repos, stars, activity)
+│   ├── github_api.py  # GitHub REST + GraphQL client, query and parser
 │   ├── features.py    # feature engineering, target bands, leakage guard
 │   ├── train.py       # CV model comparison, selection, SHAP, saves model + reports
 │   ├── explain.py     # exact per-feature contributions
-│   └── predict.py     # score any GitHub username or profile JSON
+│   └── predict.py     # score any GitHub username (visibility or decline task)
 ├── models/visibility_risk_model.joblib
 ├── reports/           # metrics.json, confusion matrix, SHAP plots
 ├── dataset/developers_features_engineered.csv
@@ -120,13 +130,49 @@ python -m pytest -q                                   # leakage + pipeline tests
 
 Set `GITHUB_TOKEN` to raise the GitHub API rate limit from 60 to 5,000 requests per hour.
 
+## 🌙 Collecting v3 data (overnight run)
+
+**What it collects, per developer, in one GraphQL call:**
+- **Profile:** followers, following, repos, gists, account age, bio, company, location, website, hireable
+- **Repositories (up to 100 original repos):** stars, forks received, descriptions, topics, licenses, demo links, languages, last push, repos created this year, pinned repos, profile README
+- **Activity for 3 windows** (last 90 days, last year, previous year): commits, pull requests, issues, PR reviews, repos contributed to, private contributions, total contributions, active days, longest streak
+
+**Steps:**
+1. Create a token at [github.com/settings/tokens](https://github.com/settings/tokens) → *Generate new token (classic)* → **no scopes needed**.
+2. Set it in your terminal:
+   ```powershell
+   $env:GITHUB_TOKEN="ghp_xxx"          # Windows PowerShell
+   ```
+   ```bash
+   export GITHUB_TOKEN=ghp_xxx          # Mac / Linux
+   ```
+3. Start the collection (it stops by itself when done):
+   ```bash
+   pip install -r requirements.txt
+   python src/collect.py --target 21000
+   ```
+   - Speed is about **2,000–2,500 developers/hour** (GitHub's GraphQL limit), so 21,000 takes **8–10 hours**. Use `--target 10000` for a ~4–5 hour run.
+   - It is **resumable**: if the laptop sleeps or you press Ctrl+C, run the same command again and it continues where it stopped.
+   - Keep the laptop plugged in and disable sleep for the night.
+4. In the morning, create the anonymised dataset and train both models:
+   ```bash
+   python src/collect.py --publish                                         # -> dataset/developers_v3.csv
+   python src/train.py --data dataset/developers_v3.csv --task visibility
+   python src/train.py --data dataset/developers_v3.csv --task decline
+   python src/predict.py --username <github-user>                           # needs GITHUB_TOKEN
+   python src/predict.py --username <github-user> --task decline
+   ```
+
+Only `dataset/developers_v3.csv` (no usernames or free text) should be committed. `usernames.txt` and `developers_v3_raw.csv` are git-ignored.
+
 ## 🛠️ Tech Stack
-Python · Pandas · NumPy · Scikit-learn · XGBoost · SHAP · Matplotlib · Seaborn · Joblib · GitHub REST API · Pytest
+Python · Pandas · NumPy · Scikit-learn · XGBoost · SHAP · Matplotlib · Seaborn · Joblib · GitHub REST & GraphQL APIs · Pytest
 
 ## 🧭 Limitations & Next Steps
-- **Snapshot data** shows association, not causation. *Next:* a time-based model that predicts future activity decline from contribution history (GitHub GraphQL contributions API).
+- **Snapshot data (v2)** shows association, not causation. v3 adds a time-based task (activity decline) that predicts this year's activity from last year's.
 - **Sampling bias:** sampled via large OSS repos, so the developers are more active than the average GitHub user.
-- **Missing signals:** stars, README quality, pinned repos and commit history.
+- **Public activity only:** private work appears only when a developer chooses to show private contributions.
+- **v3 results pending:** the v3 scraper is complete and tested; the models will be retrained once collection finishes.
 
 ---
 

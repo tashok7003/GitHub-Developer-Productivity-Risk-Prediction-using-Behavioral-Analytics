@@ -2,4 +2,6 @@ __pycache__/
 *.pyc
 .ipynb_checkpoints/
 .env
-dataset/developers_profile_raw.csv
+dataset/usernames.txt
+dataset/developers_v3_raw.csv
+dataset/failed_usernames.txt
