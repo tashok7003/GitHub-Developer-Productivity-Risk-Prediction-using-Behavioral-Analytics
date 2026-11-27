@@ -1,231 +1,135 @@
-# 👨‍💻 GitHub Behavioral Analytics ML Pipeline  
-### Developer Productivity Risk Prediction using Machine Learning
+# 👨‍💻 GitHub Developer Visibility Risk Prediction
+### Behavioral analytics on 21,000 real GitHub developer profiles: leak-free, explainable, deployable
 
-Built using behavioral data from ~21,000 GitHub developers.
+Predicts whether a GitHub profile is at risk of **low visibility** (few followers), using only signals the developer controls: publishing cadence, gists, networking, account history and profile completeness. It then explains **which signals raise or lower the risk** and what to change.
 
-An end-to-end Machine Learning project that analyzes large-scale GitHub developer behavior and predicts productivity risk levels using engineered behavioral signals.
+```text
+$ python src/predict.py --username <github-user>
 
-This project demonstrates the full ML lifecycle:
-- Data collection
-- Feature engineering
-- Target creation
-- Feature selection
-- Model training
-- Evaluation & comparison
+GitHub visibility risk for @example-fresher: HIGH
+  probabilities  High 88% | Medium 11% | Low 0%
+Pushing risk UP:
+  - Public repos created per year: 1.702
+  - Public gists: 0
+  - Developers you follow: 2
+What to change:
+  1. Ship small public projects more regularly; one solid repo a month beats a burst of forks.
+  2. Share useful snippets as gists (SQL queries, configs, scripts).
+  3. Engage with the community: follow developers and projects in your field.
+```
 
 ---
 
 ## 📌 Problem Statement
 
-Open-source platforms like GitHub contain rich behavioral signals about developer activity, engagement, experience, and influence.
+Recruiters and hiring tools use GitHub as a first filter, and follower count is the most visible signal of a developer's reach. Many capable developers, especially freshers, have profiles that get little traction and don't know which of their habits cause it.
 
-This project aims to:
+**Objective:** Classify a developer's **visibility risk** into three classes, and explain the prediction:
 
-> Predict developer productivity risk level (Stable / Medium / High) using behavioral analytics derived from GitHub profile data.
+| Class | Followers | Meaning |
+|---|---|---|
+| 🔴 High risk | 0–19 | Profile is unlikely to be noticed |
+| 🟡 Medium risk | 20–99 | Some traction |
+| 🟢 Low risk | 100+ | Strong community visibility |
 
-Since real burnout/productivity labels are not publicly available, a proxy stability score was engineered using activity, experience, influence, and engagement signals.
-
----
-
-## 📊 Dataset Overview
-
-Data was collected from major open-source repositories and expanded using contributor networks.
-
-### Scale
-- 👥 ~21,000 developers  
-- 📁 35 total features  
-- 🎯 3-class target variable  
-
-### Raw Profile Features
-- Followers / Following
-- Public repositories
-- Public gists
-- Account age
-- Bio presence
-- Hireable status
-- Company/location metadata
+**Leakage rule:** the target is built from `followers`, so **no follower-derived feature is a model input**. This is enforced by an assertion in training and by unit tests.
 
 ---
 
-## 🧠 Feature Engineering
+## ⚠️ What changed from v1 (and why)
 
-Behavioral signals were engineered to capture meaningful developer patterns.
+v1 reported **~99% accuracy**, but that was **target leakage**. Its label (`stability_score`) was a weighted sum of `popularity_score`, `project_density`, `experience_score` and `engagement_index`, and those same columns were used as model inputs. A depth-2 decision tree on that formula alone scores **99.98%**, so the models were relearning a formula rather than predicting anything.
 
-### 🔹 Influence Signals
-- popularity_score  
-- influence_score  
-- influence_density  
-- follower_following_ratio  
+v2 fixes it:
+- A **real outcome** (follower band) as the target, with all follower-derived inputs removed
+- Bot accounts removed, stratified split, **5-fold CV on train only**, model picked by CV and never by test score
+- A majority-class baseline to show the real lift
+- SHAP explainability, a saved model, a prediction CLI and tests
 
-### 🔹 Activity Signals
-- total_projects  
-- repos_per_year  
-- project_density  
-- public_repos / public_gists  
-
-### 🔹 Experience Signals
-- account_age_days  
-- experience_score  
-
-### 🔹 Engagement Signals
-- engagement_index  
-- productivity_proxy  
-
-Final selected feature set: **14 high-importance predictors**
+The v1 notebook is kept in [`legacy/`](legacy/) for transparency.
 
 ---
 
-## 🎯 Target Variable Creation
+## 📊 Dataset
 
-A composite **stability_score** was created using normalized behavioral signals:
+- **20,964 developers** (21,000 collected, minus 36 bots), from a Feb 2026 snapshot
+- Collected by seeding with contributors of TensorFlow, PyTorch, VS Code, React, Go, Rust, Kubernetes and Spark, then expanding one hop through their contributors' repos ([`src/collect.py`](src/collect.py))
+- Personal identifiers (usernames, names, company/location text) are **not** redistributed; only numeric and boolean signals are kept
 
-- Popularity
-- Project density
-- Experience
-- Engagement
-
-This was converted into a 3-class classification problem:
-
-| Risk Level | Meaning |
-|---|---|
-| 0 | Stable |
-| 1 | Medium Risk |
-| 2 | High Risk |
+**Model inputs (14):** `public_repos`, `public_gists`, `total_projects`, `repos_per_year`, `project_density`, `repo_gist_ratio`, `account_age_days`, `following`, `bio_length`, `has_bio`, `has_company`, `has_location`, `hireable`, `profile_completeness`
 
 ---
 
-## 🤖 Models Trained
+## 📈 Results (held-out test set, 4,193 developers)
 
-Three models were evaluated:
+| Model | CV accuracy | Train acc | **Test acc** | Macro-F1 | ROC-AUC |
+|---|---|---|---|---|---|
+| Baseline (majority class) | 0.345 | 0.345 | 0.345 | 0.171 | 0.500 |
+| **Logistic Regression ✅** | **0.635** | **0.636** | **0.636** | **0.630** | **0.817** |
+| Random Forest | 0.629 | 0.826 | 0.628 | 0.625 | 0.810 |
+| XGBoost | 0.634 | 0.721 | 0.640 | 0.635 | 0.817 |
 
-- Logistic Regression (baseline)
-- Random Forest
-- XGBoost (final model)
+- All models beat the baseline by **about 30 points**.
+- **Logistic Regression was selected**: it ties XGBoost on CV, shows **no overfitting** (train ≈ test), and its SHAP explanations are exact.
+- Errors sit mostly in the Medium class. The model almost never confuses High risk with Low risk.
+- An honest ~64% on 3 classes is expected for profile-only signals. Visibility also depends on things a profile doesn't show (talks, blogs, employer brand).
 
----
-
-## 📈 Evaluation Metrics
-
-Models were compared using:
-
-- Accuracy
-- Precision
-- Recall
-- F1-score
-- Confusion Matrix
-- Multi-class ROC-AUC
-
-### Final Results (Test Performance)
-
-| Model | Accuracy |
-|---|---|
-| Logistic Regression | ~99.45% |
-| Random Forest | ~99.23% |
-| XGBoost | ~99.21% |
-
-XGBoost was selected as the final model due to its robustness and strong performance on tabular behavioral data.
-
----
+<p align="center"><img src="reports/shap_summary_high_risk.png" width="560"></p>
 
 ## 🔍 Key Insights
 
-Top predictors of developer stability:
+1. **Publishing cadence (`repos_per_year`) is the strongest controllable lever.** Steady output lowers risk.
+2. **Following others** is strongly associated with visibility, because networking is reciprocal.
+3. **Account age** matters: newer developers start behind and need to compensate with cadence.
+4. **Profile basics:** only 21% of high-risk profiles have a bio, against 59% of low-risk ones.
 
-- popularity_score  
-- engagement_index  
-- experience_score  
-- total_projects  
-- productivity_proxy  
-- account_age_days  
-
-These results suggest that influence, activity consistency, and experience are strong indicators of long-term productivity stability.
+*These are associations from a snapshot, not causal effects.*
 
 ---
 
 ## 📁 Project Structure
 
 ```text
-├── dataset/
-│ └── developers_features_engineered.csv
-└── GitHub_Behavioral_Analytics_ML_Pipeline.ipynb
+├── GitHub_Developer_Visibility_Risk_Pipeline.ipynb   # full walkthrough, executed
+├── src/
+│   ├── collect.py     # GitHub API data collection (token via env var)
+│   ├── features.py    # feature engineering, target bands, leakage guard
+│   ├── train.py       # CV model comparison, selection, SHAP, saves model + reports
+│   ├── explain.py     # exact per-feature contributions
+│   └── predict.py     # score any GitHub username or profile JSON
+├── models/visibility_risk_model.joblib
+├── reports/           # metrics.json, confusion matrix, SHAP plots
+├── dataset/developers_features_engineered.csv
+├── examples/sample_profile.json
+├── tests/test_pipeline.py
+└── legacy/            # v1 notebook (leaky, kept for reference)
 ```
-
----
-
-## 🛠️ Tech Stack
-
-- Python  
-- Pandas, NumPy  
-- Scikit-learn  
-- XGBoost  
-- Seaborn, Matplotlib  
-- Joblib  
-
----
 
 ## 🚀 How to Run
 
-### 1️⃣ Clone the repository
-
 ```bash
-git clone <repo-link>
-cd <project-folder>
+git clone https://github.com/tashok7003/GitHub-Developer-Productivity-Risk-Prediction-using-Behavioral-Analytics.git
+cd GitHub-Developer-Productivity-Risk-Prediction-using-Behavioral-Analytics
+pip install -r requirements.txt
+
+python src/train.py                                   # retrain + regenerate reports/
+python src/predict.py --username octocat              # score a live profile
+python src/predict.py --profile-json examples/sample_profile.json --format json
+python -m pytest -q                                   # leakage + pipeline tests
 ```
-### 2️⃣ Install dependencies
 
-```bash
-pip install pandas numpy scikit-learn xgboost matplotlib seaborn joblib
-```
+Set `GITHUB_TOKEN` to raise the GitHub API rate limit from 60 to 5,000 requests per hour.
 
-### 3️⃣ Open the notebook
-```bash
-jupyter notebook GitHub_Behavioral_Analytics_ML_Pipeline.ipynb
-```
-Run all cells to reproduce the full pipeline.
+## 🛠️ Tech Stack
+Python · Pandas · NumPy · Scikit-learn · XGBoost · SHAP · Matplotlib · Seaborn · Joblib · GitHub REST API · Pytest
 
----
-
-## 📌 ML Pipeline Phases
-
-- Data collection from GitHub contributor networks  
-- Profile feature extraction  
-- Behavioral feature engineering  
-- Stability score creation  
-- 3-class risk label generation  
-- Automated feature selection  
-- Model training (LR, RF, XGB)  
-- Model evaluation & comparison  
-
----
-
-## 🎓 What This Project Demonstrates
-
-- End-to-end ML system design  
-- Large-scale behavioral feature engineering  
-- Proxy target creation strategy  
-- Automated feature selection  
-- Multi-model evaluation on real-world data  
-
----
-
-## 📈 Future Improvements
-
-- SHAP explainability for feature interpretation  
-- FastAPI deployment for real-time inference  
-- Streamlit dashboard for interactive predictions  
-- Time-series activity modeling  
+## 🧭 Limitations & Next Steps
+- **Snapshot data** shows association, not causation. *Next:* a time-based model that predicts future activity decline from contribution history (GitHub GraphQL contributions API).
+- **Sampling bias:** sampled via large OSS repos, so the developers are more active than the average GitHub user.
+- **Missing signals:** stars, README quality, pinned repos and commit history.
+- **Agent skill:** `predict.py` is packaged as an AI-agent skill that audits a user's GitHub profile.
 
 ---
 
 ## 👤 Author
-
-**Ashok T**  
-Domain: Data Science & Machine Learning  
-
----
-
-## ⭐ If you found this useful
-
-Consider giving the repo a star ⭐
-
-
+**Ashok T**: Data Science & Machine Learning · [GitHub](https://github.com/tashok7003) · [LinkedIn](https://linkedin.com/in/ashok--profile)
