@@ -102,6 +102,7 @@ The v1 notebook is kept in [`legacy/`](legacy/) for transparency.
 ├── dataset/developers_features_engineered.csv
 ├── examples/sample_profile.json
 ├── tests/test_pipeline.py
+├── agent_skill/       # SKILL.md agent skill (stdlib-only scorer + fix playbook)
 └── legacy/            # v1 notebook (leaky, kept for reference)
 ```
 
@@ -127,7 +128,7 @@ Python · Pandas · NumPy · Scikit-learn · XGBoost · SHAP · Matplotlib · Se
 - **Snapshot data** shows association, not causation. *Next:* a time-based model that predicts future activity decline from contribution history (GitHub GraphQL contributions API).
 - **Sampling bias:** sampled via large OSS repos, so the developers are more active than the average GitHub user.
 - **Missing signals:** stars, README quality, pinned repos and commit history.
-- **Agent skill:** `predict.py` is packaged as an AI-agent skill that audits a user's GitHub profile.
+- **Agent skill:** [`agent_skill/github-profile-visibility-audit`](agent_skill/github-profile-visibility-audit) packages the model as a dependency-free AI-agent skill (SKILL.md) for Claude, ChatGPT, Cursor and Codex. It audits any GitHub profile and returns a ranked fix plan.
 
 ---
 
