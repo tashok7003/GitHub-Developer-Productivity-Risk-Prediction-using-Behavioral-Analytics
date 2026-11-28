@@ -51,27 +51,46 @@ def discover(gh: GitHubClient, target: int, out: Path,
             return saved[:target]
     seen: set[str] = set()
     queue: list[str] = []                      # breadth-first order of discovery
+    partial = out.with_suffix(".partial.txt")  # progress file so a restart resumes phase 1
 
     def add(login: str) -> None:
         if login not in seen:
             seen.add(login); queue.append(login)
 
-    for repo in SEED_REPOS:
-        for c in gh.rest_paged(f"/repos/{repo}/contributors", 500):
-            if c.get("type") == "User":
-                add(c["login"])
-        print(f"Phase 1 seed {repo}: {len(queue):,} users", flush=True)
-    last_print, i = 0, 0
+    def save_progress(i: int) -> None:
+        partial.write_text(f"{i}\n" + "\n".join(queue))
+
+    i = 0
+    if partial.exists():
+        lines = partial.read_text().split()
+        i = int(lines[0]) if lines else 0
+        for u in lines[1:]:
+            add(u)
+        print(f"Phase 1: resuming with {len(queue):,} users found so far", flush=True)
+    else:
+        for repo in SEED_REPOS:
+            for c in gh.rest_paged(f"/repos/{repo}/contributors", 500) or []:
+                if isinstance(c, dict) and c.get("type") == "User":
+                    add(c["login"])
+            print(f"Phase 1 seed {repo}: {len(queue):,} users", flush=True)
+        save_progress(0)
+
+    last_print = len(queue)
     while len(queue) < target and i < len(queue):     # expand hop by hop until target reached
         login = queue[i]; i += 1
-        for repo in gh.rest(f"/users/{login}/repos", per_page=repos_per_user, sort="updated") or []:
-            for c in gh.rest(f"/repos/{repo['full_name']}/contributors", per_page=contrib_per_repo) or []:
-                if c.get("type") == "User":
-                    add(c["login"])
+        try:
+            for repo in gh.rest(f"/users/{login}/repos", per_page=repos_per_user, sort="updated") or []:
+                for c in gh.rest(f"/repos/{repo['full_name']}/contributors", per_page=contrib_per_repo) or []:
+                    if isinstance(c, dict) and c.get("type") == "User":
+                        add(c["login"])
+        except Exception as e:             # one bad repo must never stop the run
+            print(f"  skip {login}: {e}", flush=True)
         if len(queue) - last_print >= 1000:
             last_print = len(queue)
+            save_progress(i)
             print(f"Phase 1 expand: {len(queue):,} users", flush=True)
     logins = queue[:target]
+    partial.unlink(missing_ok=True)
     out.write_text("\n".join(logins))
     print(f"Phase 1 done: {len(logins):,} usernames -> {out.name}")
     return logins

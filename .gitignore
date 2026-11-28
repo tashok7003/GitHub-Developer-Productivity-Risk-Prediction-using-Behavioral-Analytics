@@ -5,3 +5,4 @@ __pycache__/
 dataset/usernames.txt
 dataset/developers_v3_raw.csv
 dataset/failed_usernames.txt
+dataset/usernames.partial.txt

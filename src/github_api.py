@@ -91,10 +91,18 @@ class GitHubClient:
                 self._sleep_for_limit(r); continue
             if r.status_code >= 500:
                 time.sleep(5 * (attempt + 1)); continue
-            if r.status_code in (404, 410, 451):
-                return None
-            r.raise_for_status()
-            return r.json()
+            if r.status_code in (404, 409, 410, 451):
+                return None              # missing, empty (409) or blocked repo/user
+            if r.status_code == 202:     # GitHub still computing stats: try again shortly
+                time.sleep(3); continue
+            if r.status_code == 204 or not r.content.strip():
+                return None              # empty repository -> no contributors
+            if r.status_code >= 400:
+                return None              # any other client error: skip this item
+            try:
+                return r.json()
+            except ValueError:
+                return None              # malformed body: skip instead of crashing
         return None
 
     def rest_paged(self, path: str, limit: int, **params):
